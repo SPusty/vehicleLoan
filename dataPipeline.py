@@ -9,37 +9,42 @@ logger = logging.getLogger(__name__)
 #Load
 def importData(rawFile):
     df = pd.read_excel(rawFile)
+    logger.info("Importing %s",rawFile)
     return df
 
-# Inspect & Transform
-def inspNtrnsfrmData(df):
-    print("First few rows of the dataframe:")
-    print(df.head())
-    print("\nSize of the data:")
-    print(df.shape)
-    print("\nData types of each column:")
-    print(df.dtypes)
-    print("\nColumn names of the data:")
-    print(df.columns) 
-    print("\nNumber of missing values in each column:")
-    print(df.isnull().sum())
-    print("\nDuplicate rows in the data:")
-    print(df.duplicated().sum())
-    #removing whitespace from column names and renaming appropriately
+# Inspect
+def inspData(df):
+    logger.info("\nFirst few rows of the dataframe:\n %s",df.head())
+    logger.info("\nSize of the data:\n %s",df.shape)
+    logger.info("\nData types of each column:\n %s",df.dtypes)
+    logger.info("\nNumber of missing values in each column:\n%s",df.isna().sum())
+    logger.info("\nDuplicate rows in the data:\n%s", df.duplicated().sum())
+    return df
+#clean
+def clnHeader(df):       
+    #renaming columns appropriately
     df.columns = (df.columns
                 .str.strip()
                 .str.lower()
-                .str.replace('.', '_', regex=False)
-                .str.replace(' ', '_', regex=False))
-    print("\nColumn names after cleaning:")
-    print(df.columns)
-    #dropping duplicate rows, if any
+                .str.replace(r'[^a-z0-9]+', '_', regex=True))
+    logger.info("\nColumn names after cleaning:\n%s",df.columns)
+        #required column chcek
+    req_cols =['uniqueid','disbursed_amount']
+    miss_cols = [col for col in req_cols if col not in df.columns]
+    if miss_cols:
+        raise KeyError(f"Data set is missing required columns:{miss_cols}")
+
+    return df
+
+#transform
+def trnsfrmData(df):
+    #dropping duplicate rows
     duplicate_count = df.duplicated().sum()
     if duplicate_count > 0:
-        print(f"\nNumber of duplicate rows found: {duplicate_count}. Dropping duplicates...")
+        logger.info("\nNumber of duplicate rows found:%s", duplicate_count)
         df.drop_duplicates(inplace=True)
     else:
-        print(f"\nNumber of duplicate rows found: {duplicate_count}. No duplicates to drop.")
+        logger.info("\n No duplicates found %s", )
     
     #filling missing values in the 'employment_type' column with 'Unknown'
     print(f"\nNumber of missing values in 'employment_type' column before filling: {df['employment_type'].isnull().sum()}.")
@@ -53,7 +58,7 @@ def inspNtrnsfrmData(df):
     df['disbursaldate'] = pd.to_datetime(df['disbursaldate'],errors='coerce')
     df['date_of_birth'] = pd.to_datetime(df['date_of_birth'],errors='coerce')
     #numeric col
-    num_col =['disbursed_amount','asset_cost',]
+    num_col =['disbursed_amount','asset_cost','ltv']
     for col in num_col:
         df[col] = pd.to_numeric(df[col],errors='coerce')
     #invalid check
@@ -80,13 +85,16 @@ def saveCleandata(df_clean,cleanFile):
 def main():
     rawFile="rawLoanData.xlsx"
     cleanFile="cleanLoanData.xlsx"
+    
 
     df = importData(rawFile)
     if df is  None:
         logger.error("Data has not been imported.")
         return
     else:
-        df_clean = inspNtrnsfrmData(df)
+        df = inspData(df)
+        df = clnHeader(df)
+        df_clean = trnsfrmData(df)
 
     saveCleandata(df_clean,cleanFile)
 
